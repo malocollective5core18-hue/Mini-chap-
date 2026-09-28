@@ -44,12 +44,71 @@ button:disabled{opacity:.35;cursor:not-allowed}
 .foot{display:flex;justify-content:flex-end;gap:6px}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--text);color:var(--bg);padding:7px 12px;border-radius:6px;font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s}
 .toast.show{opacity:1}
+
+/* ---------- Responsive layer ---------- */
+.wrap{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.tools{display:block}
+.row.wraps{flex-wrap:wrap}
+.row.wraps input[type=text]{flex:1 1 150px}
+.toast{max-width:90vw;text-align:center}
+.dialog{max-height:90vh;overflow:auto}
+th:nth-child(1),th:nth-child(3),th:nth-child(4){width:1%}
+
+/* Touch devices (Android phones and tablets): bigger tap areas, same type sizes */
+@media (pointer:coarse){
+  button{min-height:30px;padding:4px 10px}
+  .counter button{width:28px;height:28px}
+  .counter span{min-width:26px}
+  td,th{padding-top:5px;padding-bottom:5px}
+}
+
+/* Mouse and trackpad: smaller input text is safe (no focus zoom) */
+@media (hover:hover) and (pointer:fine){
+  input[type=text]{font-size:13px;padding:6px 9px}
+  tbody tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+  button:not(:disabled):hover{border-color:var(--accent)}
+  button.primary:not(:disabled):hover{filter:brightness(1.08)}
+}
+
+/* Small phones */
+@media (max-width:380px){
+  .wrap{padding-top:8px}
+  th,td{padding-left:4px;padding-right:4px}
+  .acts{gap:3px}
+  .acts button{padding-left:6px;padding-right:6px}
+}
+
+/* Tablets */
+@media (min-width:600px){
+  .wrap{max-width:860px;padding-top:20px;padding-bottom:28px}
+  h1{font-size:15px;margin-bottom:12px}
+  .card{padding:10px 12px;margin-bottom:10px}
+  th,td{padding-left:8px;padding-right:8px}
+  th{font-size:10px}
+}
+
+/* Laptops and desktops: toolbar side by side, roomier table */
+@media (min-width:1024px){
+  .wrap{max-width:1040px;padding-top:28px}
+  .tools{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch}
+  .tools .card{margin-bottom:10px;display:flex;flex-direction:column;justify-content:space-between}
+  th,td{padding-left:12px;padding-right:12px}
+  td.name{min-width:240px}
+  .foot{margin-top:2px}
+}
+
+/* Landscape phones: keep the dialog and toast reachable */
+@media (max-height:480px){
+  .wrap{padding-top:6px}
+  h1{margin-bottom:6px}
+}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Mini Records</h1>
 
+  <div class="tools">
   <div class="card">
     <div class="row">
       <input type="text" id="search" placeholder="Search records…" autocomplete="off" aria-label="Search">
@@ -59,13 +118,14 @@ button:disabled{opacity:.35;cursor:not-allowed}
   </div>
 
   <div class="card">
-    <div class="row">
+    <div class="row wraps">
       <input type="text" id="newItem" placeholder="Add new data…" autocomplete="off" aria-label="New data">
       <button class="primary" id="addBtn">Add</button>
       <button id="importBtn" title="Import .xlsx, .xls or .csv">Import Excel</button>
       <input type="file" id="fileIn" accept=".xlsx,.xls,.csv" hidden>
     </div>
     <div class="meta"><span>Import: column A = data, column B = number (optional). Header row is detected automatically.</span></div>
+  </div>
   </div>
 
   <div class="card tablewrap">
