@@ -41,7 +41,7 @@ button:disabled{opacity:.35;cursor:not-allowed}
 .dialog{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;max-width:300px;width:100%}
 .dialog p{margin:0 0 12px;font-size:13px;word-break:break-word}
 .dialog .acts{justify-content:flex-end}
-.foot{display:flex;justify-content:flex-end}
+.foot{display:flex;justify-content:flex-end;gap:6px}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--text);color:var(--bg);padding:7px 12px;border-radius:6px;font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s}
 .toast.show{opacity:1}
 </style>
@@ -62,7 +62,10 @@ button:disabled{opacity:.35;cursor:not-allowed}
     <div class="row">
       <input type="text" id="newItem" placeholder="Add new data…" autocomplete="off" aria-label="New data">
       <button class="primary" id="addBtn">Add</button>
+      <button id="importBtn" title="Import .xlsx, .xls or .csv">Import Excel</button>
+      <input type="file" id="fileIn" accept=".xlsx,.xls,.csv" hidden>
     </div>
+    <div class="meta"><span>Import: column A = data, column B = number (optional). Header row is detected automatically.</span></div>
   </div>
 
   <div class="card tablewrap">
@@ -72,7 +75,7 @@ button:disabled{opacity:.35;cursor:not-allowed}
     </table>
     <div id="empty" class="empty" hidden></div>
   </div>
-  <div class="foot"><button class="danger" id="clearAll">Clear All</button></div>
+  <div class="foot"><button id="exportBtn">Export Excel</button><button class="danger" id="clearAll">Clear All</button></div>
 </div>
 <div class="modal" id="modal" hidden>
   <div class="dialog" role="dialog" aria-modal="true">
@@ -82,6 +85,7 @@ button:disabled{opacity:.35;cursor:not-allowed}
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 (function(){
   var KEY = 'mini-records-v1';
@@ -103,7 +107,7 @@ button:disabled{opacity:.35;cursor:not-allowed}
     try{ localStorage.setItem(KEY, JSON.stringify({items:items,nextId:nextId})); }catch(e){ toast('Could not save: browser storage is blocked'); }
   }
   function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-  function toast(msg){var t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(function(){t.classList.remove('show')},1800)}
+  function toast(msg,ms){var t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(function(){t.classList.remove('show')},ms||1800)}
   function exists(text, exceptId){
     var k = text.trim().toLowerCase();
     return items.some(function(i){return i.id!==exceptId && i.text.toLowerCase()===k});
@@ -124,6 +128,7 @@ button:disabled{opacity:.35;cursor:not-allowed}
       return !q || i.text.toLowerCase().indexOf(q)>-1 || String(i.id)===q;
     });
     $('clearAll').disabled = !items.length;
+    $('exportBtn').disabled = !items.length;
     $('count').textContent = list.length + ' of ' + items.length + ' records';
     var html = '';
     list.forEach(function(i){
@@ -210,6 +215,81 @@ button:disabled{opacity:.35;cursor:not-allowed}
   function addFromInput(){
     if(add($('newItem').value)){$('newItem').value='';render();toast('Added')}
   }
+  function importRows(rows){
+    var start=0,dc=0,nc=1,hi=-1,i,j;
+    for(i=0;i<rows.length;i++){if(rows[i].some(function(c){return String(c).trim()!==''})){hi=i;break}}
+    if(hi<0){toast('The file is empty',3500);return}
+    var head=rows[hi].map(function(c){return String(c).trim().toLowerCase()});
+    var d=-1,n=-1;
+    head.forEach(function(h,k){
+      if(d<0 && /^(data|name|item|title|record|description|entered data|product)$/.test(h)) d=k;
+      if(n<0 && /^(number|num|qty|quantity|count|amount|no\.?)$/.test(h)) n=k;
+    });
+    if(d>-1){dc=d;nc=n;start=hi+1}else{start=hi}
+    var seen={};items.forEach(function(x){seen[x.text.toLowerCase()]=1});
+    var added=0,dup=0,blank=0;
+    for(j=start;j<rows.length;j++){
+      var r=rows[j];
+      var text=String(r[dc]==null?'':r[dc]).trim();
+      if(!text){blank++;continue}
+      var k=text.toLowerCase();
+      if(seen[k]){dup++;continue}
+      var num=0;
+      if(nc>-1 && r[nc]!=='' && r[nc]!=null){var v=Number(r[nc]);if(isFinite(v)&&v>=0)num=Math.floor(v)}
+      seen[k]=1;items.push({id:nextId++,text:text,num:num});added++;
+    }
+    save();render();
+    toast('Imported '+added+(dup?', skipped '+dup+' duplicate'+(dup>1?'s':''):'')+(blank?', '+blank+' blank':''),4500);
+  }
+  function importFile(file){
+    if(typeof XLSX==='undefined'){toast('Excel reader failed to load. Check your internet connection.',4500);return}
+    var fr=new FileReader();
+    fr.onload=function(ev){
+      try{
+        var wb=XLSX.read(ev.target.result,{type:'array'});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        importRows(XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true}));
+      }catch(err){toast('Could not read that file',4000)}
+    };
+    fr.onerror=function(){toast('Could not read that file',4000)};
+    fr.readAsArrayBuffer(file);
+  }
+  function exportFile(){
+    if(!items.length){toast('Nothing to export');return}
+    if(typeof XLSX==='undefined'){toast('Excel library failed to load. Check your internet connection.',4500);return}
+    var buf;
+    try{
+      var data=[['ID','Data','Number']].concat(items.map(function(i){return [i.id,i.text,i.num]}));
+      var ws=XLSX.utils.aoa_to_sheet(data);
+      ws['!cols']=[{wch:6},{wch:34},{wch:10}];
+      var wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb,ws,'Records');
+      buf=XLSX.write(wb,{type:'array',bookType:'xlsx'});
+    }catch(err){toast('Could not build the file',4000);return}
+    var d=new Date(),pad=function(n){return (n<10?'0':'')+n};
+    var name='mini-records-'+d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'.xlsx';
+    var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    if(window.claude && typeof window.claude.use==='function'){
+      window.claude.use('downloads').then(function(dl){
+        if(!dl){toast('Downloads are not available in this view',4500);return}
+        return dl.save({filename:name,data:blob}).then(function(){toast('Exported '+items.length+' records',3000)},function(err){
+          toast(err&&err.code==='declined'?'Export cancelled':'Could not export the file',3500);
+        });
+      });
+    }else{
+      var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(function(){URL.revokeObjectURL(a.href)},2000);
+      toast('Exported '+items.length+' records',3000);
+    }
+  }
+  $('exportBtn').addEventListener('click',exportFile);
+  $('importBtn').addEventListener('click',function(){$('fileIn').click()});
+  $('fileIn').addEventListener('change',function(e){
+    var f=e.target.files&&e.target.files[0];
+    if(f)importFile(f);
+    e.target.value='';
+  });
   $('addBtn').addEventListener('click',addFromInput);
   $('newItem').addEventListener('keydown',function(e){if(e.key==='Enter')addFromInput()});
 
