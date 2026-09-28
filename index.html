@@ -11,14 +11,14 @@
 :root[data-theme="dark"]{--bg:#0f1218;--card:#181c25;--text:#e8eaf0;--muted:#8b93a3;--line:#2a303c;--accent:#5b8def;--danger:#f26d6d;--ok:#4ade80}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:12px/1.3 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{touch-action:manipulation;-webkit-text-size-adjust:100%;margin:0;background:var(--bg);color:var(--text);font:12px/1.3 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 .wrap{max-width:720px;margin:0 auto;padding:12px}
 h1{font-size:14px;font-weight:600;margin:2px 0 10px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;margin-bottom:8px}
 .row{display:flex;gap:8px}
-input[type=text]{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--text);font:inherit;font-size:12px}
+input[type=text]{flex:1;min-width:0;padding:4px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--text);font:inherit;font-size:16px}
 input:focus{outline:2px solid var(--accent);outline-offset:-1px}
-button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:4px;padding:2px 7px;font-size:11px}
+button{touch-action:manipulation;font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:4px;padding:2px 7px;font-size:11px}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
 button.danger{color:var(--danger)}
 button.solid-danger{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:600}
@@ -151,7 +151,7 @@ button:disabled{opacity:.35;cursor:not-allowed}
         em.textContent = 'No records yet. Add your first one above.';
       }
     }else{ em.hidden = true; }
-    if(editingId!==null){var ei=$('editInput'); if(ei){ei.focus();ei.setSelectionRange(ei.value.length,ei.value.length)}}
+    if(editingId!==null){var ei=$('editInput'); if(ei){ei.focus({preventScroll:true});ei.setSelectionRange(ei.value.length,ei.value.length)}}
   }
   function counter(n,on){
     var d = on ? '' : ' disabled title="Click Edit to change"';
@@ -175,12 +175,12 @@ button:disabled{opacity:.35;cursor:not-allowed}
       cur.text=v;cur.num=editNum;editingId=null;save();render();toast('Updated');
     }
     else if(a==='del' && it){
-      delId=id;$('modalText').textContent='Delete "'+it.text+'"? This cannot be undone.';$('modal').hidden=false;$('modalNo').focus();
+      delId=id;$('modalText').textContent='Delete "'+it.text+'"? This cannot be undone.';$('modal').hidden=false;$('modalNo').focus({preventScroll:true});
     }
   });
   $('clearAll').addEventListener('click',function(){
     if(!items.length) return;
-    delId='all';$('modalText').textContent='Delete all '+items.length+' records? This cannot be undone.';$('modalYes').textContent='Clear All';$('modal').hidden=false;$('modalNo').focus();
+    delId='all';$('modalText').textContent='Delete all '+items.length+' records? This cannot be undone.';$('modalYes').textContent='Clear All';$('modal').hidden=false;$('modalNo').focus({preventScroll:true});
   });
   function closeModal(){$('modal').hidden=true;delId=null;$('modalYes').textContent='Delete'}
   $('modalNo').addEventListener('click',closeModal);
@@ -211,7 +211,7 @@ button:disabled{opacity:.35;cursor:not-allowed}
       }
     }
   });
-  $('clear').addEventListener('click',function(){$('search').value='';render();$('search').focus()});
+  $('clear').addEventListener('click',function(){$('search').value='';render();$('search').focus({preventScroll:true})});
   function addFromInput(){
     if(add($('newItem').value)){$('newItem').value='';render();toast('Added')}
   }
