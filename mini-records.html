@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mini Records</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f5f6f8;--card:#fff;--text:#1b1f27;--muted:#6b7280;--line:#e3e6ec;--accent:#2563eb;--danger:#dc2626;--ok:#16a34a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1218;--card:#181c25;--text:#e8eaf0;--muted:#8b93a3;--line:#2a303c;--accent:#5b8def;--danger:#f26d6d;--ok:#4ade80}}
+:root[data-theme="dark"]{--bg:#0f1218;--card:#181c25;--text:#e8eaf0;--muted:#8b93a3;--line:#2a303c;--accent:#5b8def;--danger:#f26d6d;--ok:#4ade80}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:12px/1.3 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:720px;margin:0 auto;padding:12px}
+h1{font-size:14px;font-weight:600;margin:2px 0 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;margin-bottom:8px}
+.row{display:flex;gap:8px}
+input[type=text]{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--text);font:inherit;font-size:12px}
+input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:4px;padding:2px 7px;font-size:11px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.danger{color:var(--danger)}
+button.solid-danger{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:600}
+.meta{color:var(--muted);font-size:10px;margin:5px 2px 0;display:flex;justify-content:space-between;gap:8px}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th,td{padding:3px 5px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+td.name{white-space:normal;word-break:break-word;min-width:100px}
+tr:last-child td{border-bottom:0}
+.counter{display:inline-flex;align-items:center;gap:3px}
+.counter button{width:20px;height:20px;padding:0;font-size:12px;line-height:1}
+.counter span{min-width:22px;text-align:center;font-weight:600;font-variant-numeric:tabular-nums}
+.acts{display:flex;gap:4px}
+.empty{text-align:center;padding:16px 8px;font-size:12px;color:var(--muted)}
+.empty button{margin-top:10px}
+button:disabled{opacity:.35;cursor:not-allowed}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+.modal[hidden]{display:none}
+.dialog{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;max-width:300px;width:100%}
+.dialog p{margin:0 0 12px;font-size:13px;word-break:break-word}
+.dialog .acts{justify-content:flex-end}
+.foot{display:flex;justify-content:flex-end}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--text);color:var(--bg);padding:7px 12px;border-radius:6px;font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Mini Records</h1>
+
+  <div class="card">
+    <div class="row">
+      <input type="text" id="search" placeholder="Search records…" autocomplete="off" aria-label="Search">
+      <button id="clear" title="Clear search">✕</button>
+    </div>
+    <div class="meta"><span id="count"></span><span>Enter in search adds if not found</span></div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <input type="text" id="newItem" placeholder="Add new data…" autocomplete="off" aria-label="New data">
+      <button class="primary" id="addBtn">Add</button>
+    </div>
+  </div>
+
+  <div class="card tablewrap">
+    <table>
+      <thead><tr><th>ID</th><th>Data</th><th>Number</th><th>Actions</th></tr></thead>
+      <tbody id="body"></tbody>
+    </table>
+    <div id="empty" class="empty" hidden></div>
+  </div>
+  <div class="foot"><button class="danger" id="clearAll">Clear All</button></div>
+</div>
+<div class="modal" id="modal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true">
+    <p id="modalText"></p>
+    <div class="acts"><button id="modalNo">Cancel</button><button class="solid-danger" id="modalYes">Delete</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  var KEY = 'mini-records-v1';
+  var items = [];
+  var nextId = 1;
+  var editingId = null, editNum = 0, editText = '', delId = null;
+  var $ = function(id){return document.getElementById(id)};
+
+  function load(){
+    try{
+      var raw = localStorage.getItem(KEY);
+      if(raw){
+        var d = JSON.parse(raw);
+        if(d && Array.isArray(d.items)){ items = d.items; nextId = d.nextId || (items.reduce(function(m,i){return Math.max(m,i.id)},0)+1); }
+      }
+    }catch(e){ items = []; nextId = 1; }
+  }
+  function save(){
+    try{ localStorage.setItem(KEY, JSON.stringify({items:items,nextId:nextId})); }catch(e){ toast('Could not save: browser storage is blocked'); }
+  }
+  function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+  function toast(msg){var t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(function(){t.classList.remove('show')},1800)}
+  function exists(text, exceptId){
+    var k = text.trim().toLowerCase();
+    return items.some(function(i){return i.id!==exceptId && i.text.toLowerCase()===k});
+  }
+
+  function add(text){
+    text = (text||'').trim();
+    if(!text){toast('Enter some data first');return false}
+    if(exists(text)){toast('Already exists');return false}
+    items.push({id:nextId++,text:text,num:0});
+    save();
+    return true;
+  }
+
+  function render(){
+    var q = $('search').value.trim().toLowerCase();
+    var list = items.filter(function(i){
+      return !q || i.text.toLowerCase().indexOf(q)>-1 || String(i.id)===q;
+    });
+    $('clearAll').disabled = !items.length;
+    $('count').textContent = list.length + ' of ' + items.length + ' records';
+    var html = '';
+    list.forEach(function(i){
+      if(editingId===i.id){
+        html += '<tr><td>'+i.id+'</td><td class="name"><input type="text" id="editInput" value="'+esc(editText)+'"></td>'+
+          '<td>'+counter(editNum,true)+'</td>'+
+          '<td><div class="acts"><button class="primary" data-a="save" data-id="'+i.id+'">Save</button><button data-a="cancel">Cancel</button></div></td></tr>';
+      }else{
+        html += '<tr><td>'+i.id+'</td><td class="name">'+esc(i.text)+'</td><td>'+counter(i.num,false)+'</td>'+
+          '<td><div class="acts"><button data-a="edit" data-id="'+i.id+'">Edit</button><button class="danger" data-a="del" data-id="'+i.id+'">Delete</button></div></td></tr>';
+      }
+    });
+    $('body').innerHTML = html;
+    var em = $('empty');
+    if(!list.length){
+      em.hidden = false;
+      if(q){
+        em.innerHTML = 'No record matches “'+esc($('search').value.trim())+'”.<br><button class="primary" id="addFromSearch">+ Add “'+esc($('search').value.trim())+'”</button>';
+      }else{
+        em.textContent = 'No records yet. Add your first one above.';
+      }
+    }else{ em.hidden = true; }
+    if(editingId!==null){var ei=$('editInput'); if(ei){ei.focus();ei.setSelectionRange(ei.value.length,ei.value.length)}}
+  }
+  function counter(n,on){
+    var d = on ? '' : ' disabled title="Click Edit to change"';
+    return '<div class="counter"><button data-a="dec"'+d+' aria-label="Decrease">−</button><span>'+n+'</span><button data-a="inc"'+d+' aria-label="Increase">+</button></div>';
+  }
+  function find(id){return items.filter(function(i){return i.id===id})[0]}
+
+  function keepText(){var ei=$('editInput');if(ei)editText=ei.value}
+  $('body').addEventListener('click',function(e){
+    var b = e.target.closest('button'); if(!b || b.disabled) return;
+    var a = b.dataset.a, id = Number(b.dataset.id), it = find(id);
+    if(a==='inc' && editingId!==null){keepText();editNum++;render()}
+    else if(a==='dec' && editingId!==null){keepText(); if(editNum>0){editNum--;render()} else toast('Already at 0')}
+    else if(a==='edit' && it){editingId=id;editText=it.text;editNum=it.num;render()}
+    else if(a==='cancel'){editingId=null;render()}
+    else if(a==='save'){
+      var cur=find(editingId); if(!cur) return;
+      var v = $('editInput').value.trim();
+      if(!v){toast('Cannot be empty');return}
+      if(exists(v,cur.id)){toast('Already exists');return}
+      cur.text=v;cur.num=editNum;editingId=null;save();render();toast('Updated');
+    }
+    else if(a==='del' && it){
+      delId=id;$('modalText').textContent='Delete "'+it.text+'"? This cannot be undone.';$('modal').hidden=false;$('modalNo').focus();
+    }
+  });
+  $('clearAll').addEventListener('click',function(){
+    if(!items.length) return;
+    delId='all';$('modalText').textContent='Delete all '+items.length+' records? This cannot be undone.';$('modalYes').textContent='Clear All';$('modal').hidden=false;$('modalNo').focus();
+  });
+  function closeModal(){$('modal').hidden=true;delId=null;$('modalYes').textContent='Delete'}
+  $('modalNo').addEventListener('click',closeModal);
+  $('modal').addEventListener('click',function(e){if(e.target.id==='modal')closeModal()});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('modal').hidden)closeModal()});
+  $('modalYes').addEventListener('click',function(){
+    if(delId==='all'){items=[];nextId=1;editingId=null;save();render();toast('All records cleared')}
+    else if(delId!==null){var id=delId;items=items.filter(function(x){return x.id!==id});if(editingId===id)editingId=null;save();render();toast('Deleted')}
+    closeModal();
+  });
+  $('body').addEventListener('keydown',function(e){
+    if(e.target.id==='editInput'){
+      if(e.key==='Enter'){var s=document.querySelector('[data-a="save"]');if(s)s.click()}
+      if(e.key==='Escape'){editingId=null;render()}
+    }
+  });
+  $('empty').addEventListener('click',function(e){
+    if(e.target.id==='addFromSearch'){
+      if(add($('search').value)){$('search').value='';render();toast('Added')}
+    }
+  });
+  $('search').addEventListener('input',function(){editingId=null;render()});
+  $('search').addEventListener('keydown',function(e){
+    if(e.key==='Enter'){
+      var q=$('search').value.trim();
+      if(q && !items.some(function(i){return i.text.toLowerCase().indexOf(q.toLowerCase())>-1})){
+        if(add(q)){$('search').value='';render();toast('Added')}
+      }
+    }
+  });
+  $('clear').addEventListener('click',function(){$('search').value='';render();$('search').focus()});
+  function addFromInput(){
+    if(add($('newItem').value)){$('newItem').value='';render();toast('Added')}
+  }
+  $('addBtn').addEventListener('click',addFromInput);
+  $('newItem').addEventListener('keydown',function(e){if(e.key==='Enter')addFromInput()});
+
+  load();render();
+})();
+</script>
+</body>
+</html>
