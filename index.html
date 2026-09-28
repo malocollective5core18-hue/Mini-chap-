@@ -260,6 +260,7 @@ th:nth-child(1),th:nth-child(3),th:nth-child(4){width:1%}
   $('empty').addEventListener('click',function(e){
     if(e.target.id==='addFromSearch'){
       if(add($('search').value)){$('search').value='';render();toast('Added')}
+      $('search').focus({preventScroll:true});
     }
   });
   $('search').addEventListener('input',function(){editingId=null;render()});
@@ -274,7 +275,10 @@ th:nth-child(1),th:nth-child(3),th:nth-child(4){width:1%}
   $('clear').addEventListener('click',function(){$('search').value='';render();$('search').focus({preventScroll:true})});
   function addFromInput(){
     if(add($('newItem').value)){$('newItem').value='';render();toast('Added')}
+    $('newItem').focus({preventScroll:true});
   }
+  // Tapping Add must not steal focus from the input (keeps the mobile keyboard open)
+  $('addBtn').addEventListener('mousedown',function(e){e.preventDefault()});
   function importRows(rows){
     var start=0,dc=0,nc=1,hi=-1,i,j;
     for(i=0;i<rows.length;i++){if(rows[i].some(function(c){return String(c).trim()!==''})){hi=i;break}}
@@ -350,10 +354,12 @@ th:nth-child(1),th:nth-child(3),th:nth-child(4){width:1%}
     if(f)importFile(f);
     e.target.value='';
   });
+  $('addBtn').addEventListener('mousedown',function(e){e.preventDefault()});
   $('addBtn').addEventListener('click',addFromInput);
   $('newItem').addEventListener('keydown',function(e){if(e.key==='Enter')addFromInput()});
 
   load();render();
+  if(window.matchMedia('(hover:hover) and (pointer:fine)').matches){$('newItem').focus({preventScroll:true})}
 })();
 </script>
 </body>
